@@ -57,8 +57,8 @@ export interface SearchOptions {
 }
 
 export interface RustDocArgs {
-  crateName: string;
-  version?: string;
+	crateName: string;
+	version?: string;
 }
 
 export interface RustCrateSearchArgs {
@@ -68,14 +68,25 @@ export interface RustCrateSearchArgs {
 }
 
 export function isRustDocArgs(args: unknown): args is RustDocArgs {
-  return typeof args === 'object' && args !== null &&
-    typeof (args as RustDocArgs).crateName === 'string' &&
-    ((args as RustDocArgs).version === undefined || typeof (args as RustDocArgs).version === 'string');
+	return (
+		typeof args === "object" &&
+		args !== null &&
+		typeof (args as RustDocArgs).crateName === "string" &&
+		((args as RustDocArgs).version === undefined ||
+			typeof (args as RustDocArgs).version === "string")
+	);
 }
 
-export function isRustCrateSearchArgs(args: unknown): args is RustCrateSearchArgs {
-  return typeof args === 'object' && args !== null &&
-    typeof (args as RustCrateSearchArgs).query === 'string' &&
-    ((args as RustCrateSearchArgs).page === undefined || typeof (args as RustCrateSearchArgs).page === 'number') &&
-    ((args as RustCrateSearchArgs).perPage === undefined || typeof (args as RustCrateSearchArgs).perPage === 'number');
+export function isRustCrateSearchArgs(
+	args: unknown,
+): args is RustCrateSearchArgs {
+	return (
+		typeof args === "object" &&
+		args !== null &&
+		typeof (args as RustCrateSearchArgs).query === "string" &&
+		((args as RustCrateSearchArgs).page === undefined ||
+			typeof (args as RustCrateSearchArgs).page === "number") &&
+		((args as RustCrateSearchArgs).perPage === undefined ||
+			typeof (args as RustCrateSearchArgs).perPage === "number")
+	);
 }

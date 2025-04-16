@@ -1,4 +1,4 @@
-import { logger } from '../logger.js';
+import { logger } from "../logger.js";
 
 interface RequestOptions {
 	method?: string;
@@ -71,7 +71,10 @@ async function rustFetch(
 
 		const response = await fetch(url, {
 			method,
-			headers: baseURL === CRATES_IO_CONFIG.baseURL ? CRATES_IO_CONFIG.headers : DOCS_RS_CONFIG.headers,
+			headers:
+				baseURL === CRATES_IO_CONFIG.baseURL
+					? CRATES_IO_CONFIG.headers
+					: DOCS_RS_CONFIG.headers,
 			body: body ? JSON.stringify(body) : undefined,
 			signal: controller.signal,
 		});
