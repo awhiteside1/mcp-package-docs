@@ -8,9 +8,9 @@ import {
 	RustType,
 	SearchOptions,
 	SymbolDefinition,
-} from "./types.js";
-import rustHttpClient from "./utils/rust-http-client.js";
-import { McpLogger } from './logger.js'
+} from "../../types";
+import rustHttpClient from "../../utils/rust-http-client";
+import { McpLogger } from '../../logger'
 
 const turndownInstance = new turndown();
 

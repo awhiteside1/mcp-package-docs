@@ -1,7 +1,7 @@
 import axios from 'axios'
 import * as ts from 'typescript';
 import { NodeHtmlMarkdown } from 'node-html-markdown';
-import { McpLogger } from './logger.js';
+import { McpLogger } from '../../../logger.js';
 
 // Initialize HTML to Markdown converter with custom options
 const nhm = new NodeHtmlMarkdown({

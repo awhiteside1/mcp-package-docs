@@ -14,12 +14,12 @@ import { fileURLToPath } from "url"
 import { dirname, join } from "path"
 import { readFileSync, existsSync } from "fs"
 import { logger, McpLogger } from './logger.js'
-import { NpmDocsHandler, NpmDocArgs, isNpmDocArgs } from './npm-docs-integration.js'
+import { NpmDocsHandler, NpmDocArgs, isNpmDocArgs } from './languages/typescript/npm/npm-docs-integration.js'
 import { SearchUtils, DocResult, SearchDocArgs, GoDocArgs, PythonDocArgs, SwiftDocArgs, isSearchDocArgs, isGoDocArgs, isPythonDocArgs, isSwiftDocArgs } from './search-utils.js'
 import Fuse from "fuse.js"
 import { RegistryUtils } from './registry-utils.js'
 import TypeScriptLspClient from "./lsp/typescript-lsp-client.js"
-import { RustDocsHandler } from "./rust-docs-integration.js"
+import { RustDocsHandler } from "./languages/rust/rust-docs-integration.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -794,7 +794,7 @@ help(${packageName})
             if (!docFetched && packageName.includes('github.com')) {
               try {
                 // Extract GitHub owner and repo from the package name
-                const githubMatch = packageName.match(/github\.com\/([^\/]+)\/([^\/]+)/)
+                const githubMatch = packageName.match(/github\.com\/([^/]+)\/([^/]+)/)
                 if (githubMatch) {
                   const owner = githubMatch[1]
                   const repo = githubMatch[2]
@@ -1662,7 +1662,7 @@ import "${packageName}"
         if (packageName.includes('github.com')) {
           try {
             // Extract GitHub owner and repo from the package name
-            const githubMatch = packageName.match(/github\.com\/([^\/]+)\/([^\/]+)/)
+            const githubMatch = packageName.match(/github\.com\/([^/]+)\/([^/]+)/)
             if (githubMatch) {
               const owner = githubMatch[1]
               const repo = githubMatch[2]

@@ -1,5 +1,5 @@
-import { NpmDocsEnhancer, PackageApiDocumentation } from './npm-docs-enhancer.js';
-import { logger } from './logger.js';
+import {NpmDocsEnhancer, PackageApiDocumentation} from './npm-docs-enhancer.js';
+import { logger } from '../../../logger.js';
 import axios from 'axios';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -344,7 +344,7 @@ export class NpmDocsHandler {
 
           if (typesContent) {
             apiDocumentation = await this.enhancer.extractApiDocumentation(packageName, typesContent);
-            result.apiDocumentation = apiDocumentation;
+            result.apiDocumentation = apiDocumentation ;
 
             // Add API documentation to the formatted doc
             if (apiDocumentation && (apiDocumentation.exports.length > 0 || apiDocumentation.types.length > 0)) {
