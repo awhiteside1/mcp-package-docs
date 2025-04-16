@@ -1,6 +1,6 @@
-# Package Documentation MCP Server
+# Typescript  MCP Server
 
-An MCP (Model Context Protocol) server that provides LLMs with efficient access to package documentation across multiple programming languages and language server protocol (LSP) capabilities.
+Forked from https://smcleod.net, modified to be typescript focused and provide more efficient interfaces to the AI.  - An MCP (Model Context Protocol) server that provides LLMs with efficient access to package documentation across multiple programming languages and language server protocol (LSP) capabilities.
 
 [![smithery badge](https://smithery.ai/badge/mcp-package-docs)](https://smithery.ai/server/mcp-package-docs)
 
