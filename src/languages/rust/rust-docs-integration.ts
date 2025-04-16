@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import turndown from "turndown";
-import type { McpLogger } from "../../logger.js";
+import type {McpLogger} from "../../utils/logger.ts";
+import rustHttpClient from "./rust-http-client.js";
 import type {
 	CrateInfo,
 	CrateSearchResult,
@@ -9,8 +10,7 @@ import type {
 	RustType,
 	SearchOptions,
 	SymbolDefinition,
-} from "../../types.js";
-import rustHttpClient from "../../utils/rust-http-client.js";
+} from "./types.ts";
 
 const turndownInstance = new turndown();
 

@@ -2,10 +2,10 @@ import * as childProcess from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
+import type { Diagnostic } from "vscode-languageserver-protocol";
 import {
 	type CompletionItem,
 	type CompletionParams,
-	createMessageConnection,
 	type DidOpenTextDocumentParams,
 	type Hover,
 	type InitializeParams,
@@ -15,9 +15,9 @@ import {
 	StreamMessageWriter,
 	type TextDocumentIdentifier,
 	type TextDocumentItem,
+	createMessageConnection,
 } from "vscode-languageserver-protocol/node.js";
-import { logger, type McpLogger } from "../logger.js";
-import type { Diagnostic } from "vscode-languageserver-protocol";
+import { type McpLogger, logger } from "../utils/logger.js";
 
 export interface LanguageServerConfig {
 	command: string;

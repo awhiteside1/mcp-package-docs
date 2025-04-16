@@ -1,4 +1,4 @@
-import type { McpLogger } from "./logger.js";
+import type { McpLogger } from "./utils/logger.js";
 
 export interface DocResult {
 	description?: string;
@@ -86,7 +86,6 @@ export const isGoDocArgs = (args: unknown): args is GoDocArgs => {
 			(args as GoDocArgs).projectPath === undefined)
 	);
 };
-
 export const isSwiftDocArgs = (args: unknown): args is SwiftDocArgs => {
 	return (
 		typeof args === "object" &&
@@ -98,7 +97,6 @@ export const isSwiftDocArgs = (args: unknown): args is SwiftDocArgs => {
 			(args as SwiftDocArgs).projectPath === undefined)
 	);
 };
-
 export const isPythonDocArgs = (args: unknown): args is PythonDocArgs => {
 	return (
 		typeof args === "object" &&
@@ -110,7 +108,6 @@ export const isPythonDocArgs = (args: unknown): args is PythonDocArgs => {
 			(args as PythonDocArgs).projectPath === undefined)
 	);
 };
-
 export const isNpmDocArgs = (args: unknown): args is NpmDocArgs => {
 	return (
 		typeof args === "object" &&
@@ -142,17 +139,14 @@ export class SearchUtils {
 	public fuzzyMatch(text: string, pattern: string): boolean {
 		const textLower = text.toLowerCase();
 		const patternLower = pattern.toLowerCase();
-
 		let textIndex = 0;
 		let patternIndex = 0;
-
 		while (textIndex < text.length && patternIndex < pattern.length) {
 			if (textLower[textIndex] === patternLower[patternIndex]) {
 				patternIndex++;
 			}
 			textIndex++;
 		}
-
 		return patternIndex === pattern.length;
 	}
 
@@ -199,7 +193,6 @@ export class SearchUtils {
 		const sections: Array<{ content: string; type: string }> = [];
 		let currentSection = "";
 		let currentType = "description";
-
 		const lines = doc.split("\n");
 		for (const line of lines) {
 			if (line.startsWith("func ")) {
@@ -224,11 +217,9 @@ export class SearchUtils {
 				currentSection += `\n${line}`;
 			}
 		}
-
 		if (currentSection) {
 			sections.push({ content: currentSection.trim(), type: currentType });
 		}
-
 		return sections;
 	}
 
@@ -239,7 +230,6 @@ export class SearchUtils {
 		const sections: Array<{ content: string; type: string }> = [];
 		let currentSection = "";
 		let currentType = "description";
-
 		const lines = doc.split("\n");
 		for (const line of lines) {
 			if (line.startsWith("class ")) {
@@ -264,11 +254,9 @@ export class SearchUtils {
 				currentSection += `\n${line}`;
 			}
 		}
-
 		if (currentSection) {
 			sections.push({ content: currentSection.trim(), type: currentType });
 		}
-
 		return sections;
 	}
 
@@ -279,7 +267,6 @@ export class SearchUtils {
 		const sections: Array<{ content: string; type: string }> = [];
 		let currentSection = "";
 		let currentType = "description";
-
 		const lines = doc.split("\n");
 		for (const line of lines) {
 			if (
@@ -315,11 +302,9 @@ export class SearchUtils {
 				currentSection += `\n${line}`;
 			}
 		}
-
 		if (currentSection) {
 			sections.push({ content: currentSection.trim(), type: currentType });
 		}
-
 		return sections;
 	}
 
@@ -331,7 +316,6 @@ export class SearchUtils {
 		type: string;
 	}> {
 		const sections: Array<{ content: string; type: string }> = [];
-
 		// Add package description
 		if (data.description) {
 			sections.push({
@@ -339,7 +323,6 @@ export class SearchUtils {
 				type: "description",
 			});
 		}
-
 		// Parse README into sections
 		if (data.readme) {
 			const readmeSections = data.readme.split(/(?=^#+ )/m);
@@ -347,7 +330,6 @@ export class SearchUtils {
 				const lines = section.split("\n");
 				const heading = lines[0];
 				const content = lines.slice(1).join("\n").trim();
-
 				if (content) {
 					// Skip sections that are likely not useful for coding
 					const lowerHeading = heading.toLowerCase();
@@ -368,7 +350,6 @@ export class SearchUtils {
 					) {
 						continue;
 					}
-
 					let type = "general";
 					if (lowerHeading.includes("install")) type = "installation";
 					else if (
@@ -386,7 +367,6 @@ export class SearchUtils {
 					else if (lowerHeading.includes("quick start")) type = "quickstart";
 					else if (lowerHeading.includes("getting started"))
 						type = "quickstart";
-
 					sections.push({
 						content: `${heading}\n${content}`,
 						type,
@@ -394,7 +374,6 @@ export class SearchUtils {
 				}
 			}
 		}
-
 		return sections;
 	}
 
@@ -416,20 +395,15 @@ export class SearchUtils {
 			configuration: "",
 			other: {} as Record<string, string>,
 		};
-
 		// Split the readme into sections based on headings
 		const sections = readme.split(/(?=^#+\s+)/m);
-
 		// Process each section
 		for (const section of sections) {
 			if (!section.trim()) continue;
-
 			const lines = section.split("\n");
 			const heading = lines[0].toLowerCase();
 			const content = lines.slice(1).join("\n").trim();
-
 			if (!content) continue;
-
 			// Skip sections that are likely not useful for coding
 			if (
 				heading.includes("sponsor") ||
@@ -452,7 +426,6 @@ export class SearchUtils {
 			) {
 				continue;
 			}
-
 			// Categorize the section based on its heading
 			if (
 				heading.includes("usage") ||
@@ -512,7 +485,6 @@ export class SearchUtils {
 				result.other[sectionName] = content;
 			}
 		}
-
 		// If we couldn't find API sections by heading, try to find them by content
 		if (!result.api) {
 			// Look for code blocks that might contain API usage
@@ -522,7 +494,6 @@ export class SearchUtils {
 			if (apiCodeBlocks && apiCodeBlocks.length > 0) {
 				result.api = `## API Usage Examples\n\n${apiCodeBlocks.slice(0, 3).join("\n\n")}`;
 			}
-
 			// Look for sections that might describe request/response objects
 			if (
 				readme.includes("axios.request(config)") ||
@@ -536,7 +507,6 @@ export class SearchUtils {
 				}
 			}
 		}
-
 		return result;
 	}
 
@@ -545,22 +515,17 @@ export class SearchUtils {
 	 */
 	public extractRelevantContent(readme: string): string {
 		this.logger.debug("Extracting relevant content from README");
-
 		// First, remove all badge links and reference-style links
 		const cleanedReadme = readme
 			.replace(/\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)/g, "") // Remove badge links
 			.replace(/\[[^\]]*\]:\s*https?:\/\/[^\s]+/g, ""); // Remove reference links
-
 		// Split the readme into sections
 		const sections = cleanedReadme.split(/(?=^#+ )/m);
 		this.logger.debug(`Found ${sections.length} sections in README`);
-
 		// Always include the first code example if it exists
 		const firstCodeExample = readme.match(/```[\s\S]*?```/);
 		let hasIncludedCodeExample = false;
-
 		const relevantSections: string[] = [];
-
 		// Process the content before any headings (intro)
 		if (sections.length > 0 && !sections[0].startsWith("#")) {
 			// Include the intro section, but limit to first few paragraphs
@@ -572,13 +537,11 @@ export class SearchUtils {
 				relevantSections.push(introContent.trim());
 				this.logger.debug("Added intro section");
 			}
-
 			// If there's a code example in the intro, include it
 			if (firstCodeExample && sections[0].includes(firstCodeExample[0])) {
 				hasIncludedCodeExample = true;
 			}
 		}
-
 		// Define keywords for sections we want to keep
 		const usefulKeywords = [
 			"install",
@@ -598,7 +561,6 @@ export class SearchUtils {
 			"tutorial",
 			"how to",
 		];
-
 		// Define keywords for sections we want to skip
 		const skipKeywords = [
 			"sponsor",
@@ -624,15 +586,12 @@ export class SearchUtils {
 			"backers",
 			"funding",
 		];
-
 		// Process each section with a heading
 		for (let i = 0; i < sections.length; i++) {
 			const section = sections[i];
 			if (!section.startsWith("#")) continue;
-
 			const lines = section.split("\n");
 			const heading = lines[0].toLowerCase();
-
 			// Skip sections that are likely not useful for coding
 			let shouldSkip = false;
 			for (const keyword of skipKeywords) {
@@ -645,7 +604,6 @@ export class SearchUtils {
 				this.logger.debug(`Skipping section: ${heading}`);
 				continue;
 			}
-
 			// Include sections that are likely useful for coding
 			let shouldInclude = false;
 			for (const keyword of usefulKeywords) {
@@ -657,13 +615,11 @@ export class SearchUtils {
 					break;
 				}
 			}
-
 			// Also include sections with code examples even if they don't match keywords
 			if (!shouldInclude && section.includes("```")) {
 				shouldInclude = true;
 				this.logger.debug(`Including section due to code example: ${heading}`);
 			}
-
 			// If this is a short section with a simple heading (likely important), include it
 			if (
 				!shouldInclude &&
@@ -675,27 +631,22 @@ export class SearchUtils {
 					`Including short section with simple heading: ${heading}`,
 				);
 			}
-
 			if (shouldInclude) {
 				relevantSections.push(section);
 			}
 		}
-
 		// If we didn't find any relevant sections with headings, be less strict
 		if (relevantSections.length <= 1) {
 			this.logger.debug("Few relevant sections found, being less strict");
-
 			// Include any section with a code example
 			for (let i = 0; i < sections.length; i++) {
 				const section = sections[i];
 				if (!section.startsWith("#")) continue;
-
 				if (section.includes("```") && !relevantSections.includes(section)) {
 					relevantSections.push(section);
 					this.logger.debug("Added section with code example");
 				}
 			}
-
 			// If still no sections, include the first few sections regardless
 			if (relevantSections.length <= 1) {
 				for (let i = 0; i < Math.min(3, sections.length); i++) {
@@ -709,13 +660,11 @@ export class SearchUtils {
 				}
 			}
 		}
-
 		// If we still don't have any code examples, add the first one we found
 		if (!hasIncludedCodeExample && firstCodeExample) {
 			relevantSections.push(`## Code Example\n\n${firstCodeExample[0]}`);
 			this.logger.debug("Added first code example");
 		}
-
 		// If we still have nothing, just return a portion of the original README
 		if (relevantSections.length === 0) {
 			this.logger.debug(
@@ -724,19 +673,15 @@ export class SearchUtils {
 			// Return the first 2000 characters of the README
 			return `${readme.substring(0, 2000)}... (truncated)`;
 		}
-
 		// Join the relevant sections
 		let content = relevantSections.join("\n\n");
-
 		// Remove any remaining badge links or reference links that might be in the content
 		content = content
 			.replace(/\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)/g, "")
 			.replace(/\[[^\]]*\]:\s*https?:\/\/[^\s]+/g, "");
-
 		this.logger.debug(
 			`Extracted ${content.length} characters of relevant content`,
 		);
-
 		return content;
 	}
 }

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import * as ts from "typescript";
-import type { McpLogger } from "../../../logger.js";
+import type { McpLogger } from "../../../utils/logger.js";
 
 // Initialize HTML to Markdown converter with custom options
 const nhm = new NodeHtmlMarkdown({
@@ -278,7 +278,7 @@ export class NpmDocsEnhancer {
 		const properties: ApiProperty[] = [];
 
 		// Extract methods and properties
-		node.members.forEach((member) => {
+		for (const member of node.members) {
 			if (ts.isMethodDeclaration(member)) {
 				if (member.name) {
 					const methodName = member.name.getText();
@@ -312,7 +312,7 @@ export class NpmDocsEnhancer {
 					});
 				}
 			}
-		});
+		}
 
 		return {
 			name,
@@ -336,7 +336,7 @@ export class NpmDocsEnhancer {
 		const properties: ApiProperty[] = [];
 
 		// Extract properties
-		node.members.forEach((member) => {
+		for (const member of node.members) {
 			if (ts.isPropertySignature(member)) {
 				if (member.name) {
 					const propName = member.name.getText();
@@ -368,7 +368,7 @@ export class NpmDocsEnhancer {
 					});
 				}
 			}
-		});
+		}
 
 		return {
 			name,
@@ -410,7 +410,7 @@ export class NpmDocsEnhancer {
 		const result: ApiDocumentation[] = [];
 		const description = this.extractJSDocComment(node);
 
-		node.declarationList.declarations.forEach((declaration) => {
+		for (const declaration of node.declarationList.declarations) {
 			if (declaration.name && ts.isIdentifier(declaration.name)) {
 				const name = declaration.name.text;
 				const type = declaration.type ? declaration.type.getText() : "any";
@@ -423,7 +423,7 @@ export class NpmDocsEnhancer {
 					isExported,
 				});
 			}
-		});
+		}
 
 		return result;
 	}
@@ -460,7 +460,7 @@ export class NpmDocsEnhancer {
 		const properties: ApiProperty[] = [];
 
 		// Extract enum members
-		node.members.forEach((member) => {
+		for (const member of node.members) {
 			if (member.name) {
 				const memberName = member.name.getText();
 				const memberDescription = this.extractJSDocComment(member);
@@ -471,7 +471,7 @@ export class NpmDocsEnhancer {
 					optional: false,
 				});
 			}
-		});
+		}
 
 		return {
 			name,
@@ -511,7 +511,7 @@ export class NpmDocsEnhancer {
 
 		const comments: string[] = [];
 
-		jsDocTags.forEach((tag) => {
+		for (const tag of jsDocTags) {
 			if (tag.comment) {
 				const tagName = tag.tagName ? tag.tagName.text : "";
 				const comment =
@@ -525,7 +525,7 @@ export class NpmDocsEnhancer {
 					comments.push(comment);
 				}
 			}
-		});
+		}
 
 		return comments.join("\n");
 	}
@@ -723,27 +723,28 @@ export class NpmDocsEnhancer {
 		if (apiDoc.exports.length > 0) {
 			markdown += "## Exports\n\n";
 
-			apiDoc.exports.forEach((item) => {
+			for (const item of apiDoc.exports) {
 				markdown += this.formatApiItemAsMarkdown(item);
-			});
+			}
 		}
 
 		// Add types
 		if (apiDoc.types.length > 0) {
 			markdown += "## Types\n\n";
 
-			apiDoc.types.forEach((item) => {
+			for (const item of apiDoc.types) {
 				markdown += this.formatApiItemAsMarkdown(item);
-			});
+			}
 		}
 
 		// Add examples
 		if (apiDoc.examples && apiDoc.examples.length > 0) {
 			markdown += "## Examples\n\n";
 
-			apiDoc.examples.forEach((example, index) => {
+			for (let index = 0; index < apiDoc.examples.length; index++) {
+				const example = apiDoc.examples[index];
 				markdown += `### Example ${index + 1}\n\n\`\`\`javascript\n${example}\n\`\`\`\n\n`;
-			});
+			}
 		}
 
 		return markdown;
@@ -769,7 +770,7 @@ export class NpmDocsEnhancer {
 			if (item.parameters && item.parameters.length > 0) {
 				markdown += "**Parameters:**\n\n";
 
-				item.parameters.forEach((param) => {
+				for (const param of item.parameters) {
 					markdown += `- \`${param.name}${param.optional ? "?" : ""}: ${param.type || "any"}\``;
 					if (param.defaultValue) {
 						markdown += ` (default: ${param.defaultValue})`;
@@ -778,7 +779,7 @@ export class NpmDocsEnhancer {
 						markdown += ` - ${param.description}`;
 					}
 					markdown += "\n";
-				});
+				}
 
 				markdown += "\n";
 			}
@@ -792,13 +793,13 @@ export class NpmDocsEnhancer {
 			if (item.properties && item.properties.length > 0) {
 				markdown += "**Properties:**\n\n";
 
-				item.properties.forEach((prop) => {
+				for (const prop of item.properties) {
 					markdown += `- \`${prop.name}${prop.optional ? "?" : ""}: ${prop.type || "any"}\``;
 					if (prop.description) {
 						markdown += ` - ${prop.description}`;
 					}
 					markdown += "\n";
-				});
+				}
 
 				markdown += "\n";
 			}
@@ -806,7 +807,7 @@ export class NpmDocsEnhancer {
 			if (item.methods && item.methods.length > 0) {
 				markdown += "**Methods:**\n\n";
 
-				item.methods.forEach((method) => {
+				for (const method of item.methods) {
 					markdown += `#### ${method.name}\n\n`;
 
 					if (method.description) {
@@ -820,7 +821,7 @@ export class NpmDocsEnhancer {
 					if (method.parameters && method.parameters.length > 0) {
 						markdown += "**Parameters:**\n\n";
 
-						method.parameters.forEach((param) => {
+						for (const param of method.parameters) {
 							markdown += `- \`${param.name}${param.optional ? "?" : ""}: ${param.type || "any"}\``;
 							if (param.defaultValue) {
 								markdown += ` (default: ${param.defaultValue})`;
@@ -829,7 +830,7 @@ export class NpmDocsEnhancer {
 								markdown += ` - ${param.description}`;
 							}
 							markdown += "\n";
-						});
+						}
 
 						markdown += "\n";
 					}
@@ -837,7 +838,7 @@ export class NpmDocsEnhancer {
 					if (method.returnType) {
 						markdown += `**Returns:** \`${method.returnType}\`\n\n`;
 					}
-				});
+				}
 			}
 		} else if (item.type === "interface" || item.type === "type") {
 			markdown += `**Type:** ${item.type === "interface" ? "Interface" : "Type"}\n\n`;
@@ -849,13 +850,13 @@ export class NpmDocsEnhancer {
 			if (item.properties && item.properties.length > 0) {
 				markdown += "**Properties:**\n\n";
 
-				item.properties.forEach((prop) => {
+				for (const prop of item.properties) {
 					markdown += `- \`${prop.name}${prop.optional ? "?" : ""}: ${prop.type || "any"}\``;
 					if (prop.description) {
 						markdown += ` - ${prop.description}`;
 					}
 					markdown += "\n";
-				});
+				}
 
 				markdown += "\n";
 			}
@@ -865,13 +866,13 @@ export class NpmDocsEnhancer {
 			if (item.properties && item.properties.length > 0) {
 				markdown += "**Values:**\n\n";
 
-				item.properties.forEach((prop) => {
+				for (const prop of item.properties) {
 					markdown += `- \`${prop.name}\``;
 					if (prop.description) {
 						markdown += ` - ${prop.description}`;
 					}
 					markdown += "\n";
-				});
+				}
 
 				markdown += "\n";
 			}

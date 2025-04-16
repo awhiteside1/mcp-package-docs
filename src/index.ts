@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { logger } from "./logger.js";
 import { PackageDocsServer } from "./package-docs-server.js";
+import { logger } from "./utils/logger.js";
 
 // Initialise and run the server
 async function main() {

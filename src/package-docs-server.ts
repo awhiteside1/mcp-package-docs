@@ -19,9 +19,8 @@ import {
 	NpmDocsHandler,
 	isNpmDocArgs,
 } from "./languages/typescript/npm/npm-docs-integration.js";
-import { type McpLogger, logger } from "./logger.js";
 import TypeScriptLspClient from "./lsp/typescript-lsp-client.js";
-import { RegistryUtils } from "./registry-utils.js";
+import { RegistryUtils } from "./languages/typescript/npm/registry-utils.js";
 import {
 	type DocResult,
 	type GoDocArgs,
@@ -35,13 +34,13 @@ import {
 	isSwiftDocArgs,
 } from "./search-utils.js";
 import { getToolDefinitions } from "./tool-handlers.js";
+import { type McpLogger, logger } from "./utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJson = JSON.parse(
 	readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
 );
-
 const execAsync = promisify(exec);
 
 export class PackageDocsServer {
@@ -55,20 +54,12 @@ export class PackageDocsServer {
 	private searchUtils: SearchUtils;
 	private registryUtils: RegistryUtils;
 
-	/**
-	 * Connect the server to a transport
-	 */
-	public async connect(transport: StdioServerTransport): Promise<void> {
-		await this.server.connect(transport);
-	}
-
 	constructor() {
 		this.logger = logger.child("PackageDocs");
 		this.npmDocsHandler = new NpmDocsHandler();
 		this.rustDocsHandler = new RustDocsHandler(logger);
 		this.searchUtils = new SearchUtils(logger);
 		this.registryUtils = new RegistryUtils(logger);
-
 		this.server = new Server(
 			{
 				name: "mcp-package-docs",
@@ -80,9 +71,7 @@ export class PackageDocsServer {
 				},
 			},
 		);
-
 		this.cache = new Map();
-
 		// Check if LSP functionality is enabled via environment variable
 		this.lspEnabled = process.env.ENABLE_LSP === "true";
 		if (this.lspEnabled) {
@@ -101,20 +90,24 @@ export class PackageDocsServer {
 		} else {
 			this.logger.debug("Language Server Protocol support is disabled");
 		}
-
 		this.setupToolHandlers();
+	}
+
+	/**
+	 * Connect the server to a transport
+	 */
+	public async connect(transport: StdioServerTransport): Promise<void> {
+		await this.server.connect(transport);
 	}
 
 	private setupToolHandlers(): void {
 		this.server.setRequestHandler(ListToolsRequestSchema, async () => {
 			return getToolDefinitions(this.lspEnabled, this.lspClient);
 		});
-
 		this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
 			if (!request.params.arguments) {
 				throw new McpError(ErrorCode.InvalidParams, "Arguments are required");
 			}
-
 			// Handle LSP tools if enabled
 			if (this.lspEnabled && this.lspClient) {
 				if (request.params.name === "get_hover") {
@@ -152,13 +145,11 @@ export class PackageDocsServer {
 					);
 				}
 			}
-
 			// Handle regular package documentation tools
 			const cacheKey = JSON.stringify({
 				name: request.params.name,
 				args: request.params.arguments,
 			});
-
 			// Check cache first
 			const cachedResult = this.cache.get(cacheKey);
 			if (cachedResult) {
@@ -172,10 +163,8 @@ export class PackageDocsServer {
 					],
 				};
 			}
-
 			try {
 				let result: DocResult;
-
 				switch (request.params.name) {
 					case "search_package_docs":
 						if (!isSearchDocArgs(request.params.arguments)) {
@@ -186,13 +175,11 @@ export class PackageDocsServer {
 						}
 						result = await this.searchPackageDocs(request.params.arguments);
 						break;
-
 					case "describe_rust_package":
 						result = await this.describeRustPackage(
 							request.params.arguments as { package: string; version?: string },
 						);
 						break;
-
 					case "describe_go_package":
 					case "lookup_go_doc":
 						if (!isGoDocArgs(request.params.arguments)) {
@@ -203,7 +190,6 @@ export class PackageDocsServer {
 						}
 						result = await this.describeGoPackage(request.params.arguments);
 						break;
-
 					case "describe_python_package":
 					case "lookup_python_doc":
 						if (!isPythonDocArgs(request.params.arguments)) {
@@ -214,7 +200,6 @@ export class PackageDocsServer {
 						}
 						result = await this.describePythonPackage(request.params.arguments);
 						break;
-
 					case "describe_npm_package":
 					case "lookup_npm_doc":
 						if (!isNpmDocArgs(request.params.arguments)) {
@@ -232,7 +217,6 @@ export class PackageDocsServer {
 							this.getLocalNpmDoc.bind(this),
 						);
 						break;
-
 					case "describe_swift_package":
 						if (!isSwiftDocArgs(request.params.arguments)) {
 							throw new McpError(
@@ -242,7 +226,6 @@ export class PackageDocsServer {
 						}
 						result = await this.describeSwiftPackage(request.params.arguments);
 						break;
-
 					case "get_npm_package_doc":
 						if (!isNpmDocArgs(request.params.arguments)) {
 							throw new McpError(
@@ -252,35 +235,28 @@ export class PackageDocsServer {
 						}
 						result = await this.getNpmPackageDoc(request.params.arguments);
 						break;
-
 					default:
 						throw new McpError(
 							ErrorCode.MethodNotFound,
 							`Unknown tool: ${request.params.name}`,
 						);
 				}
-
 				// Cache the result
 				this.cache.set(cacheKey, result);
-
 				// For get_npm_package_doc, return the markdown content directly
 				if (request.params.name === "get_npm_package_doc") {
 					// Combine description, usage, and example into a single markdown document
 					let markdown = "";
-
 					if (result.description) {
 						markdown += `# ${request.params.arguments.package}\n\n${result.description}\n\n`;
 					}
-
 					if (result.usage) {
 						markdown += result.usage;
 					}
-
 					// Only add examples if they're not already included in usage
 					if (result.example && !result.usage?.includes(result.example)) {
 						markdown += `\n\n## Additional Examples\n\n${result.example}`;
 					}
-
 					return {
 						content: [
 							{
@@ -303,11 +279,9 @@ export class PackageDocsServer {
 				if (error instanceof McpError) {
 					throw error;
 				}
-
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
 				this.logger.error(`Error in ${request.params.name}:`, error);
-
 				return {
 					content: [
 						{
@@ -342,9 +316,7 @@ export class PackageDocsServer {
 					return true;
 				}
 			}
-
 			// TODO: More sophisticated checks, e.g., looking in target/debug or target/release
-
 			return false; // Assume not installed if no Cargo.toml or not found
 		} catch {
 			// If any error occurs, assume the crate is not installed
@@ -355,7 +327,7 @@ export class PackageDocsServer {
 	/**
 	 * Get documentation from a locally installed Rust crate
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	private async getLocalRustDoc(crateName: string): Promise<DocResult> {
 		try {
 			// TODO: Implement getting documentation from local target/doc directory
@@ -389,7 +361,6 @@ export class PackageDocsServer {
 					return true;
 				}
 			}
-
 			// Try to find the package in GOPATH
 			const { stdout } = await execAsync(
 				`go list -f '{{.Dir}}' ${packageName}`,
@@ -438,7 +409,6 @@ print(spec is not None)
 				packageName,
 				"package.json",
 			);
-
 			return existsSync(packageJsonPath);
 		} catch {
 			return false;
@@ -459,10 +429,8 @@ print(spec is not None)
 				: "Package.swift";
 			if (existsSync(packageSwiftPath)) {
 				const packageSwift = readFileSync(packageSwiftPath, "utf-8");
-
 				// Extract the package name from the URL
 				const packageName = this.extractSwiftPackageNameFromUrl(packageUrl);
-
 				// Simple check if the package is mentioned in Package.swift
 				if (
 					packageName &&
@@ -472,7 +440,6 @@ print(spec is not None)
 					return true;
 				}
 			}
-
 			return false;
 		} catch {
 			return false;
@@ -491,14 +458,11 @@ print(spec is not None)
 				? `go doc ${packageName}.${symbol}`
 				: `go doc ${packageName}`;
 			const { stdout } = await execAsync(cmd);
-
 			// Parse the go doc output into a structured format
 			const lines = stdout.split("\n");
 			const result: DocResult = {};
-
 			let section: "description" | "usage" | "example" = "description";
 			let content: string[] = [];
-
 			for (const line of lines) {
 				if (line.startsWith("func") || line.startsWith("type")) {
 					if (content.length > 0) {
@@ -516,11 +480,9 @@ print(spec is not None)
 					content.push(line);
 				}
 			}
-
 			if (content.length > 0) {
 				result[section] = content.join("\n").trim();
 			}
-
 			return result;
 		} catch (error) {
 			const errorMessage =
@@ -548,16 +510,12 @@ help(${packageName}.${symbol})
 import ${packageName}
 help(${packageName})
 `;
-
 			const { stdout } = await execAsync(`python3 -c "${pythonCode}"`);
-
 			// Parse the Python help output into a structured format
 			const lines = stdout.split("\n");
 			const result: DocResult = {};
-
 			let section: "description" | "usage" | "example" = "description";
 			let content: string[] = [];
-
 			for (const line of lines) {
 				if (line.startsWith("class") || line.startsWith("def")) {
 					if (content.length > 0) {
@@ -575,11 +533,9 @@ help(${packageName})
 					content.push(line);
 				}
 			}
-
 			if (content.length > 0) {
 				result[section] = content.join("\n").trim();
 			}
-
 			return result;
 		} catch (error) {
 			const errorMessage =
@@ -605,18 +561,15 @@ help(${packageName})
 				join(packagePath, "README.markdown"),
 				join(packagePath, "README"),
 			];
-
 			// Read package.json for basic info
 			const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 			const result: DocResult = {
 				description: packageJson.description || "No description available",
 			};
-
 			// Try to find and read README
 			for (const readmePath of readmePaths) {
 				if (existsSync(readmePath)) {
 					const readme = readFileSync(readmePath, "utf-8");
-
 					// Extract usage and examples from README
 					const sections = readme.split(/#+\s/);
 					for (const section of sections) {
@@ -630,11 +583,9 @@ help(${packageName})
 							result.example = section.split("\n").slice(1).join("\n").trim();
 						}
 					}
-
 					break;
 				}
 			}
-
 			return result;
 		} catch (error) {
 			const errorMessage =
@@ -660,13 +611,11 @@ help(${packageName})
 					error: "Could not extract package name from URL",
 				};
 			}
-
 			// Try to get documentation using swift-doc if available
 			try {
 				const cmd = symbol
 					? `swift doc generate ${packageName} --module-name ${packageName} --symbol ${symbol}`
 					: `swift doc generate ${packageName} --module-name ${packageName}`;
-
 				const { stdout } = await execAsync(cmd);
 				return {
 					description: stdout.trim(),
@@ -678,14 +627,12 @@ help(${packageName})
 					: "Package.swift";
 				if (existsSync(packageSwiftPath)) {
 					const packageSwift = readFileSync(packageSwiftPath, "utf-8");
-
 					// Try to find the package declaration
 					const packageRegex = new RegExp(
 						`\\b${packageName}\\b[\\s\\S]*?\\{[\\s\\S]*?\\}`,
 						"i",
 					);
 					const packageMatch = packageSwift.match(packageRegex);
-
 					if (packageMatch) {
 						return {
 							description: `Swift package: ${packageName}`,
@@ -693,23 +640,19 @@ help(${packageName})
 						};
 					}
 				}
-
 				// If we still don't have documentation, check for a README
 				const readmePaths = [
 					projectPath ? join(projectPath, "README.md") : "README.md",
 					projectPath ? join(projectPath, "readme.md") : "readme.md",
 				];
-
 				for (const readmePath of readmePaths) {
 					if (existsSync(readmePath)) {
 						const readme = readFileSync(readmePath, "utf-8");
-
 						// Extract sections related to the package
 						const sections = readme.split(/#+\s/);
 						const relevantSections = sections.filter((section) =>
 							section.toLowerCase().includes(packageName.toLowerCase()),
 						);
-
 						if (relevantSections.length > 0) {
 							return {
 								description: `Swift package: ${packageName}`,
@@ -724,7 +667,6 @@ help(${packageName})
 					}
 				}
 			}
-
 			return {
 				description: `Swift package: ${packageName}`,
 				usage: "No detailed documentation available locally.",
@@ -747,7 +689,6 @@ help(${packageName})
 			const urlObj = new URL(url);
 			const pathParts = urlObj.pathname.split("/");
 			const lastPart = pathParts[pathParts.length - 1];
-
 			// Remove .git extension if present
 			return lastPart.replace(/\.git$/, "");
 		} catch {
@@ -774,13 +715,11 @@ help(${packageName})
 		this.logger.debug(
 			`Searching ${language} package ${packageName} for "${query}"`,
 		);
-
 		try {
 			let docContent: string | Array<{ content: string; type: string }> = "";
 			let isInstalled = false;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 			let packageInfo: any = null;
-
 			// Check if package is installed locally first
 			switch (language) {
 				case "rust":
@@ -800,16 +739,12 @@ help(${packageName})
 							// Get crate details from crates.io
 							const crateDetails =
 								await this.rustDocsHandler.getCrateDetails(packageName);
-
 							// Get documentation from docs.rs
 							const documentation =
 								await this.rustDocsHandler.getCrateDocumentation(packageName);
-
 							// Parse the documentation into sections
 							const sections = documentation.split(/#+\s+/m);
-
 							docContent = [];
-
 							// Add description
 							if (crateDetails.description) {
 								docContent.push({
@@ -817,15 +752,12 @@ help(${packageName})
 									type: "description",
 								});
 							}
-
 							// Process each section
 							for (const section of sections) {
 								if (!section.trim()) continue;
-
 								const lines = section.split("\n");
 								const heading = lines[0].toLowerCase();
 								const content = lines.join("\n");
-
 								let type = "general";
 								if (heading.includes("example")) type = "example";
 								else if (
@@ -844,10 +776,8 @@ help(${packageName})
 									heading.includes("method")
 								)
 									type = "function";
-
 								docContent.push({ content, type });
 							}
-
 							// Add package metadata
 							packageInfo = crateDetails;
 						} catch (error) {
@@ -855,7 +785,6 @@ help(${packageName})
 						}
 					}
 					break;
-
 				case "go":
 					isInstalled = await this.isGoPackageInstalledLocally(
 						packageName,
@@ -873,7 +802,6 @@ help(${packageName})
 					} else {
 						// Fetch from pkg.go.dev using multiple methods
 						let docFetched = false;
-
 						// First try using go doc command (works for standard library and cached modules)
 						try {
 							const { stdout } = await execAsync(`go doc ${packageName}`);
@@ -884,15 +812,12 @@ help(${packageName})
 								`go doc command failed for ${packageName}: ${cmdError}`,
 							);
 						}
-
 						// If go doc command fails, try to get package info from pkg.go.dev API
 						if (!docFetched) {
 							try {
 								const url = `https://pkg.go.dev/api/packages/${encodeURIComponent(packageName)}`;
 								this.logger.debug(`Fetching from pkg.go.dev API: ${url}`);
-
 								const response = await axios.get(url);
-
 								if (response.data) {
 									packageInfo = response.data;
 									if (packageInfo.Documentation || packageInfo.Synopsis) {
@@ -916,7 +841,6 @@ help(${packageName})
 								);
 							}
 						}
-
 						// If API fails, try to fetch from GitHub if it's a GitHub URL
 						if (!docFetched && packageName.includes("github.com")) {
 							try {
@@ -927,23 +851,18 @@ help(${packageName})
 								if (githubMatch) {
 									const owner = githubMatch[1];
 									const repo = githubMatch[2];
-
 									// Try to fetch README.md from the main branch
 									const readmeUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
 									this.logger.debug(
 										`Attempting to fetch README from GitHub for search: ${readmeUrl}`,
 									);
-
 									const readmeResponse = await axios.get(readmeUrl);
 									if (readmeResponse.data) {
 										const readme = readmeResponse.data;
-
 										// Parse the README content into sections
 										const sections = readme.split(/#+\s/);
-
 										// Create structured content from README sections
 										docContent = [];
-
 										// Add a general description section
 										if (sections.length > 0) {
 											docContent.push({
@@ -951,15 +870,12 @@ help(${packageName})
 												type: "description",
 											});
 										}
-
 										// Process each section
 										for (let i = 1; i < sections.length; i++) {
 											const section = sections[i];
 											if (!section.trim()) continue;
-
 											const lines = section.split("\n");
 											const heading = lines[0].toLowerCase();
-
 											// Determine section type
 											let type = "general";
 											if (
@@ -987,19 +903,16 @@ help(${packageName})
 											) {
 												type = "configuration";
 											}
-
 											docContent.push({
 												content: section,
 												type: type,
 											});
 										}
-
 										// Add import example
 										docContent.push({
 											content: `// Import the package\nimport "${packageName}"\n\n// For more details, visit: https://pkg.go.dev/${encodeURIComponent(packageName)}`,
 											type: "example",
 										});
-
 										docFetched = true;
 									}
 								}
@@ -1009,7 +922,6 @@ help(${packageName})
 								);
 							}
 						}
-
 						// If GitHub fetch fails or it's not a GitHub URL, try web scraping approach
 						if (!docFetched) {
 							try {
@@ -1017,13 +929,10 @@ help(${packageName})
 								this.logger.debug(
 									`Attempting to fetch documentation from: ${url}`,
 								);
-
 								const response = await axios.get(url);
-
 								if (response.data) {
 									// Extract basic package information from HTML
 									const html = response.data;
-
 									// Simple extraction of package description
 									const descriptionMatch = html.match(
 										/<meta name="description" content="([^"]+)"/,
@@ -1031,43 +940,36 @@ help(${packageName})
 									const description = descriptionMatch
 										? descriptionMatch[1]
 										: `Go package: ${packageName}`;
-
 									// Try to extract documentation content
 									const docMatch = html.match(
 										/<div class="Documentation-content">[\s\S]*?<\/div>/,
 									);
 									let documentation = docMatch ? docMatch[0] : "";
-
 									// Try to extract package overview
 									const overviewMatch = html.match(
 										/<section id="pkg-overview"[\s\S]*?<\/section>/,
 									);
 									const overview = overviewMatch ? overviewMatch[0] : "";
-
 									// Try to extract constants
 									const constantsMatch = html.match(
 										/<section id="pkg-constants"[\s\S]*?<\/section>/,
 									);
 									const constants = constantsMatch ? constantsMatch[0] : "";
-
 									// Try to extract variables
 									const variablesMatch = html.match(
 										/<section id="pkg-variables"[\s\S]*?<\/section>/,
 									);
 									const variables = variablesMatch ? variablesMatch[0] : "";
-
 									// Try to extract functions
 									const functionsMatch = html.match(
 										/<section id="pkg-functions"[\s\S]*?<\/section>/,
 									);
 									const functions = functionsMatch ? functionsMatch[0] : "";
-
 									// Try to extract types
 									const typesMatch = html.match(
 										/<section id="pkg-types"[\s\S]*?<\/section>/,
 									);
 									const types = typesMatch ? typesMatch[0] : "";
-
 									// Extract code examples if available
 									const examplesMatch = html.match(
 										/<pre class="Documentation-exampleCode">[\s\S]*?<\/pre>/g,
@@ -1075,13 +977,11 @@ help(${packageName})
 									const examples = examplesMatch
 										? examplesMatch.join("\n\n")
 										: "";
-
 									// Extract API documentation - look for function and type definitions
 									const apiDocsMatch =
 										html.match(/<h3 id="[^"]*">[\s\S]*?<pre[\s\S]*?<\/pre>/g) ||
 										[];
 									const apiDocs = apiDocsMatch.join("\n\n");
-
 									// Extract function signatures
 									const funcSignatures: string[] = [];
 									const funcSignatureMatches = html.matchAll(
@@ -1090,7 +990,6 @@ help(${packageName})
 									for (const match of funcSignatureMatches) {
 										funcSignatures.push(`func ${match[2]}`);
 									}
-
 									// Extract type definitions
 									const typeDefinitions: string[] = [];
 									const typeDefMatches = html.matchAll(
@@ -1099,7 +998,6 @@ help(${packageName})
 									for (const match of typeDefMatches) {
 										typeDefinitions.push(`type ${match[2]}`);
 									}
-
 									// Clean up HTML tags from the extracted content
 									const cleanHtml = (html: string): string => {
 										return html
@@ -1112,7 +1010,6 @@ help(${packageName})
 											.replace(/\s+/g, " ") // Normalize whitespace
 											.trim();
 									};
-
 									// Combine all the extracted content
 									documentation = [
 										overview ? cleanHtml(overview) : "",
@@ -1131,13 +1028,11 @@ help(${packageName})
 									]
 										.filter(Boolean)
 										.join("\n\n");
-
 									// Create content sections
 									docContent = [
 										{ content: description, type: "description" },
 										{ content: documentation, type: "documentation" },
 									];
-
 									// Add examples if available
 									if (examples) {
 										docContent.push({
@@ -1159,7 +1054,6 @@ help(${packageName})
 								);
 							}
 						}
-
 						// If all methods fail, create minimal content to avoid returning an error
 						if (!docFetched) {
 							docContent = [
@@ -1175,7 +1069,6 @@ help(${packageName})
 						}
 					}
 					break;
-
 				case "python":
 					isInstalled = await this.isPythonPackageInstalledLocally(packageName);
 					if (isInstalled) {
@@ -1196,17 +1089,14 @@ help(${packageName})
 						const response = await axios.get(url);
 						if (response.data?.info) {
 							packageInfo = response.data.info;
-
 							// Extract more comprehensive information
 							const description = packageInfo.summary || "";
 							const longDescription = packageInfo.description || "";
-
 							// Try to parse the long description as markdown/rst
 							docContent = [
 								{ content: description, type: "description" },
 								{ content: longDescription, type: "documentation" },
 							];
-
 							// Convert docContent to array if it's a string
 							if (typeof docContent === "string") {
 								docContent = [
@@ -1214,7 +1104,6 @@ help(${packageName})
 									{ content: longDescription, type: "documentation" },
 								];
 							}
-
 							// Add project URLs if available
 							if (packageInfo.project_urls) {
 								let urlsContent = "### Project URLs\n\n";
@@ -1227,7 +1116,6 @@ help(${packageName})
 									docContent.push({ content: urlsContent, type: "links" });
 								}
 							}
-
 							// Add classifiers if available
 							if (
 								packageInfo.classifiers &&
@@ -1244,7 +1132,6 @@ help(${packageName})
 						}
 					}
 					break;
-
 				case "npm":
 					isInstalled = this.isNpmPackageInstalledLocally(
 						packageName,
@@ -1259,22 +1146,18 @@ help(${packageName})
 								{ content: localDoc.example || "", type: "example" },
 							].filter((item) => item.content);
 						}
-
 						// Try to get additional information from package.json
 						try {
 							const basePath = projectPath || process.cwd();
 							const packagePath = join(basePath, "node_modules", packageName);
 							const packageJsonPath = join(packagePath, "package.json");
-
 							if (existsSync(packageJsonPath)) {
 								packageInfo = JSON.parse(
 									readFileSync(packageJsonPath, "utf-8"),
 								);
-
 								// Add dependencies information
 								if (packageInfo.dependencies || packageInfo.devDependencies) {
 									let depsContent = "### Dependencies\n\n";
-
 									if (packageInfo.dependencies) {
 										depsContent += "#### Runtime Dependencies\n\n";
 										for (const [dep, version] of Object.entries(
@@ -1284,7 +1167,6 @@ help(${packageName})
 										}
 										depsContent += "\n";
 									}
-
 									if (packageInfo.devDependencies) {
 										depsContent += "#### Development Dependencies\n\n";
 										for (const [dep, version] of Object.entries(
@@ -1293,7 +1175,6 @@ help(${packageName})
 											depsContent += `- ${dep}: ${version}\n`;
 										}
 									}
-
 									if (Array.isArray(docContent)) {
 										docContent.push({
 											content: depsContent,
@@ -1315,21 +1196,16 @@ help(${packageName})
 						if (config.token) {
 							headers.Authorization = `Bearer ${config.token}`;
 						}
-
 						const url = `${config.registry}/${packageName}`;
 						const response = await axios.get(url, { headers });
 						if (response.data) {
 							packageInfo = response.data;
-
 							// Parse README and other metadata
 							docContent = this.searchUtils.parseNpmDoc(packageInfo);
-
 							// Add additional sections with more comprehensive information
-
 							// Add dependencies information
 							if (packageInfo.dependencies || packageInfo.devDependencies) {
 								let depsContent = "### Dependencies\n\n";
-
 								if (packageInfo.dependencies) {
 									depsContent += "#### Runtime Dependencies\n\n";
 									for (const [dep, version] of Object.entries(
@@ -1339,7 +1215,6 @@ help(${packageName})
 									}
 									depsContent += "\n";
 								}
-
 								if (packageInfo.devDependencies) {
 									depsContent += "#### Development Dependencies\n\n";
 									for (const [dep, version] of Object.entries(
@@ -1348,10 +1223,8 @@ help(${packageName})
 										depsContent += `- ${dep}: ${version}\n`;
 									}
 								}
-
 								docContent.push({ content: depsContent, type: "dependencies" });
 							}
-
 							// Add TypeScript information if available
 							if (
 								(packageInfo.types || packageInfo.typings) &&
@@ -1365,7 +1238,6 @@ help(${packageName})
 						}
 					}
 					break;
-
 				case "swift":
 					isInstalled = await this.isSwiftPackageInstalledLocally(
 						packageName,
@@ -1395,18 +1267,15 @@ help(${packageName})
 								if (githubParts.length === 2) {
 									const repoPath = githubParts[1];
 									const readmeUrl = `https://raw.githubusercontent.com/${repoPath}/main/README.md`;
-
 									const response = await axios.get(readmeUrl);
 									if (response.data) {
 										// Parse the README content
 										const readme = response.data;
-
 										// Extract sections
 										const sections = readme.split(/#+\s/);
 										let description = "";
 										let usage = "";
 										let example = "";
-
 										for (const section of sections) {
 											const lower = section.toLowerCase();
 											if (
@@ -1424,7 +1293,6 @@ help(${packageName})
 												example = section;
 											}
 										}
-
 										docContent = [
 											{
 												content: description || "Swift package",
@@ -1444,7 +1312,6 @@ help(${packageName})
 					}
 					break;
 			}
-
 			// If no content was found, return an error
 			if (
 				!docContent ||
@@ -1455,11 +1322,9 @@ help(${packageName})
 					suggestInstall: !isInstalled,
 				};
 			}
-
 			// Perform search on the documentation content
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 			const searchResults: any[] = [];
-
 			if (Array.isArray(docContent)) {
 				// For structured content (array of sections)
 				if (fuzzy) {
@@ -1472,21 +1337,17 @@ help(${packageName})
 						ignoreLocation: true,
 						findAllMatches: true,
 					};
-
 					const fuse = new Fuse(docContent, fuseOptions);
 					const results = fuse.search(query);
-
 					for (const result of results) {
 						const section = result.item;
 						const symbol = this.searchUtils.extractSymbol(
 							section.content,
 							language,
 						);
-
 						// Extract more context around the match
 						const lines = section.content.split("\n");
 						const firstLine = lines[0];
-
 						// Find the specific line that contains the match
 						let matchLineIndex = -1;
 						for (let i = 0; i < lines.length; i++) {
@@ -1495,7 +1356,6 @@ help(${packageName})
 								break;
 							}
 						}
-
 						// Extract more context around the match
 						let contextLines: string[];
 						if (matchLineIndex >= 0) {
@@ -1507,7 +1367,6 @@ help(${packageName})
 							// If no specific match found, take the first several lines
 							contextLines = lines.slice(1, Math.min(lines.length, 15));
 						}
-
 						// Include code examples in the context if present
 						const codeExampleMatch = section.content.match(/```[\s\S]*?```/);
 						if (
@@ -1518,7 +1377,6 @@ help(${packageName})
 							contextLines.push("Code example:");
 							contextLines.push(codeExampleMatch[0]);
 						}
-
 						searchResults.push({
 							symbol,
 							match: firstLine,
@@ -1537,7 +1395,6 @@ help(${packageName})
 							);
 							const lines = section.content.split("\n");
 							const firstLine = lines[0];
-
 							// Find the specific line that contains the match
 							let matchLineIndex = -1;
 							for (let i = 0; i < lines.length; i++) {
@@ -1546,7 +1403,6 @@ help(${packageName})
 									break;
 								}
 							}
-
 							// Extract more context around the match
 							let contextLines: string[];
 							if (matchLineIndex >= 0) {
@@ -1558,7 +1414,6 @@ help(${packageName})
 								// If no specific match found, take the first several lines
 								contextLines = lines.slice(1, Math.min(lines.length, 15));
 							}
-
 							// Include code examples in the context if present
 							const codeExampleMatch = section.content.match(/```[\s\S]*?```/);
 							if (
@@ -1569,7 +1424,6 @@ help(${packageName})
 								contextLines.push("Code example:");
 								contextLines.push(codeExampleMatch[0]);
 							}
-
 							searchResults.push({
 								symbol,
 								match: firstLine,
@@ -1583,7 +1437,6 @@ help(${packageName})
 			} else {
 				// For plain text content
 				const lines = docContent.split("\n");
-
 				// Find all matching lines
 				const matchingLineIndices: number[] = [];
 				for (let i = 0; i < lines.length; i++) {
@@ -1596,11 +1449,9 @@ help(${packageName})
 						matchingLineIndices.push(i);
 					}
 				}
-
 				// Group nearby matches to avoid duplicate context
 				const groupedMatches: number[][] = [];
 				let currentGroup: number[] = [];
-
 				for (let i = 0; i < matchingLineIndices.length; i++) {
 					if (
 						i === 0 ||
@@ -1614,21 +1465,17 @@ help(${packageName})
 						currentGroup.push(matchingLineIndices[i]);
 					}
 				}
-
 				if (currentGroup.length > 0) {
 					groupedMatches.push(currentGroup);
 				}
-
 				// Process each group of matches
 				for (const group of groupedMatches) {
 					const firstMatchIndex = group[0];
 					const lastMatchIndex = group[group.length - 1];
-
 					// Get context around the group
 					const contextStart = Math.max(0, firstMatchIndex - 5);
 					const contextEnd = Math.min(lines.length, lastMatchIndex + 10);
 					const context = lines.slice(contextStart, contextEnd).join("\n");
-
 					// Find a suitable heading for this match
 					let heading = "Match";
 					for (let i = firstMatchIndex; i >= 0; i--) {
@@ -1637,7 +1484,6 @@ help(${packageName})
 							break;
 						}
 					}
-
 					searchResults.push({
 						match: heading,
 						context,
@@ -1645,18 +1491,14 @@ help(${packageName})
 					});
 				}
 			}
-
 			// Sort results by score (lower is better)
 			searchResults.sort((a, b) => a.score - b.score);
-
 			// Limit number of results but ensure we have enough context
 			const limitedResults = searchResults.slice(0, 5);
-
 			// Add package metadata to provide context
 			let packageMetadata = "";
 			if (packageInfo) {
 				packageMetadata = `Package: ${packageName}\n`;
-
 				if (language === "npm") {
 					if (packageInfo.version)
 						packageMetadata += `Version: ${packageInfo.version}\n`;
@@ -1686,7 +1528,6 @@ help(${packageName})
 					if (packageUrl) packageMetadata += `Package: ${packageUrl}\n`;
 				}
 			}
-
 			return {
 				description: packageMetadata || undefined,
 				searchResults: {
@@ -1727,7 +1568,6 @@ help(${packageName})
 		if (!this.lspClient) {
 			throw new McpError(ErrorCode.InternalError, "LSP client not initialized");
 		}
-
 		try {
 			const result = await this.lspClient.getHover(
 				args.languageId,
@@ -1737,7 +1577,6 @@ help(${packageName})
 				args.character,
 				args.projectRoot,
 			);
-
 			return {
 				content: [
 					{
@@ -1776,7 +1615,6 @@ help(${packageName})
 		if (!this.lspClient) {
 			throw new McpError(ErrorCode.InternalError, "LSP client not initialized");
 		}
-
 		try {
 			const result = await this.lspClient.getCompletions(
 				args.languageId,
@@ -1786,7 +1624,6 @@ help(${packageName})
 				args.character,
 				args.projectRoot,
 			);
-
 			return {
 				content: [
 					{
@@ -1825,7 +1662,6 @@ help(${packageName})
 		if (!this.lspClient) {
 			throw new McpError(ErrorCode.InternalError, "LSP client not initialized");
 		}
-
 		try {
 			const result = await this.lspClient.getDiagnostics(
 				args.languageId,
@@ -1833,7 +1669,6 @@ help(${packageName})
 				args.content,
 				args.projectRoot,
 			);
-
 			return {
 				content: [
 					{
@@ -1869,38 +1704,31 @@ help(${packageName})
 		this.logger.debug(
 			`Getting Go documentation for ${packageName}${symbol ? `.${symbol}` : ""}`,
 		);
-
 		try {
 			// Check if package is installed locally first
 			const isInstalled = await this.isGoPackageInstalledLocally(
 				packageName,
 				projectPath,
 			);
-
 			if (isInstalled) {
 				this.logger.debug(`Using local documentation for ${packageName}`);
 				return await this.getLocalGoDoc(packageName, symbol);
 			}
-
 			// If not installed, try to fetch from pkg.go.dev
 			this.logger.debug(
 				`Fetching Go documentation for ${packageName} from pkg.go.dev`,
 			);
-
 			try {
 				// First try using go doc command (works for standard library and cached modules)
 				const cmd = symbol
 					? `go doc ${packageName}.${symbol}`
 					: `go doc ${packageName}`;
 				const { stdout } = await execAsync(cmd);
-
 				// Parse the output into a structured format
 				const lines = stdout.split("\n");
 				const result: DocResult = {};
-
 				let section: "description" | "usage" | "example" = "description";
 				let content: string[] = [];
-
 				for (const line of lines) {
 					if (line.startsWith("func") || line.startsWith("type")) {
 						if (content.length > 0) {
@@ -1918,45 +1746,36 @@ help(${packageName})
 						content.push(line);
 					}
 				}
-
 				if (content.length > 0) {
 					result[section] = content.join("\n").trim();
 				}
-
 				return result;
 			} catch {
 				// If go doc command fails, try to fetch from pkg.go.dev API
 				try {
 					const url = `https://pkg.go.dev/api/packages/${encodeURIComponent(packageName)}`;
 					this.logger.debug(`Fetching from pkg.go.dev API: ${url}`);
-
 					const response = await axios.get(url);
-
 					if (response.data) {
 						const pkgInfo = response.data;
-
 						// Create a structured result from the API response
 						const result: DocResult = {
 							description: pkgInfo.Synopsis || `Go package: ${packageName}`,
 						};
-
 						// Add documentation if available
 						if (pkgInfo.Documentation) {
 							result.usage = pkgInfo.Documentation;
 						}
-
 						// Add import example
 						result.example = `// Import the package
 import "${packageName}"
 
 // See full documentation at: https://pkg.go.dev/${encodeURIComponent(packageName)}`;
-
 						return result;
 					}
 				} catch (apiError) {
 					this.logger.error(`Error fetching from pkg.go.dev API: ${apiError}`);
 				}
-
 				// If both methods fail, try to fetch from GitHub if it's a GitHub URL
 				if (packageName.includes("github.com")) {
 					try {
@@ -1967,23 +1786,19 @@ import "${packageName}"
 						if (githubMatch) {
 							const owner = githubMatch[1];
 							const repo = githubMatch[2];
-
 							// Try to fetch README.md from the main branch
 							const readmeUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
 							this.logger.debug(
 								`Attempting to fetch README from GitHub: ${readmeUrl}`,
 							);
-
 							const readmeResponse = await axios.get(readmeUrl);
 							if (readmeResponse.data) {
 								const readme = readmeResponse.data;
-
 								// Parse the README content
 								const sections = readme.split(/#+\s/);
 								let description = "";
 								let usage = "";
 								let example = "";
-
 								// Extract relevant sections
 								for (const section of sections) {
 									const lower = section.toLowerCase();
@@ -2005,27 +1820,22 @@ import "${packageName}"
 										example = section;
 									}
 								}
-
 								// If we couldn't find a description section, use the first section
 								if (!description && sections.length > 1) {
 									description = sections[1];
 								}
-
 								// Format the description
 								const formattedDescription = description
 									? description.split("\n").slice(0, 3).join("\n").trim()
 									: `Go package: ${packageName}`;
-
 								// Format the usage
 								const formattedUsage = usage
 									? usage
 									: `For detailed documentation, visit: https://pkg.go.dev/${encodeURIComponent(packageName)}`;
-
 								// Format the example
 								const formattedExample = example
 									? example
 									: `// Import the package\nimport "${packageName}"\n\n// For more details, visit: https://pkg.go.dev/${encodeURIComponent(packageName)}`;
-
 								return {
 									description: formattedDescription,
 									usage: formattedUsage,
@@ -2037,18 +1847,14 @@ import "${packageName}"
 						this.logger.error(`Error fetching from GitHub: ${githubError}`);
 					}
 				}
-
 				// If GitHub fetch fails or it's not a GitHub URL, try web scraping approach
 				try {
 					const url = `https://pkg.go.dev/${encodeURIComponent(packageName)}`;
 					this.logger.debug(`Attempting to fetch documentation from: ${url}`);
-
 					const response = await axios.get(url);
-
 					if (response.data) {
 						// Extract basic package information from HTML
 						const html = response.data;
-
 						// Simple extraction of package description
 						const descriptionMatch = html.match(
 							/<meta name="description" content="([^"]+)"/,
@@ -2056,19 +1862,16 @@ import "${packageName}"
 						const description = descriptionMatch
 							? descriptionMatch[1]
 							: `Go package: ${packageName}`;
-
 						// Try to extract documentation content
 						const docMatch = html.match(
 							/<div class="Documentation-content">[\s\S]*?<\/div>/,
 						);
 						const documentation = docMatch ? docMatch[0] : "";
-
 						// Try to extract package overview
 						const overviewMatch = html.match(
 							/<section id="pkg-overview"[\s\S]*?<\/section>/,
 						);
 						const overview = overviewMatch ? overviewMatch[0] : "";
-
 						// Extract function signatures
 						const funcSignatures: string[] = [];
 						const funcSignatureMatches = html.matchAll(
@@ -2077,7 +1880,6 @@ import "${packageName}"
 						for (const match of funcSignatureMatches) {
 							funcSignatures.push(`func ${match[2]}`);
 						}
-
 						// Extract type definitions
 						const typeDefinitions: string[] = [];
 						const typeDefMatches = html.matchAll(
@@ -2086,13 +1888,11 @@ import "${packageName}"
 						for (const match of typeDefMatches) {
 							typeDefinitions.push(`type ${match[2]}`);
 						}
-
 						// Extract code examples if available
 						const examplesMatch = html.match(
 							/<pre class="Documentation-exampleCode">[\s\S]*?<\/pre>/g,
 						);
 						const examples = examplesMatch ? examplesMatch.join("\n\n") : "";
-
 						// Clean up HTML tags from the extracted content
 						const cleanHtml = (html: string): string => {
 							return html
@@ -2105,7 +1905,6 @@ import "${packageName}"
 								.replace(/\s+/g, " ") // Normalize whitespace
 								.trim();
 						};
-
 						// Combine all the extracted content for usage
 						const usage = [
 							overview ? cleanHtml(overview) : "",
@@ -2119,7 +1918,6 @@ import "${packageName}"
 						]
 							.filter(Boolean)
 							.join("\n\n");
-
 						// Create example content
 						const example =
 							examples ||
@@ -2127,7 +1925,6 @@ import "${packageName}"
 import "${packageName}"
 
 // For more details, visit: https://pkg.go.dev/${encodeURIComponent(packageName)}`;
-
 						return {
 							description,
 							usage:
@@ -2141,7 +1938,6 @@ import "${packageName}"
 						`Error fetching from pkg.go.dev website: ${webError}`,
 					);
 				}
-
 				// If all methods fail, return a more helpful error
 				return {
 					description: `Go package: ${packageName}`,
@@ -2171,32 +1967,26 @@ import "${packageName}"
 		this.logger.debug(
 			`Getting Python documentation for ${packageName}${symbol ? `.${symbol}` : ""}`,
 		);
-
 		try {
 			// Check if package is installed locally first
 			const isInstalled =
 				await this.isPythonPackageInstalledLocally(packageName);
-
 			if (isInstalled) {
 				this.logger.debug(`Using local documentation for ${packageName}`);
 				return await this.getLocalPythonDoc(packageName, symbol);
 			}
-
 			// If not installed, try to fetch from PyPI
 			this.logger.debug(
 				`Fetching Python documentation for ${packageName} from PyPI`,
 			);
-
 			try {
 				const url = `https://pypi.org/pypi/${packageName}/json`;
 				const response = await axios.get(url);
-
 				if (response.data?.info) {
 					const result: DocResult = {
 						description:
 							response.data.info.summary || "No description available",
 					};
-
 					// Add more detailed description if available, but limit size
 					if (response.data.info.description) {
 						// Truncate description to a reasonable length
@@ -2206,7 +1996,6 @@ import "${packageName}"
 								? `${description.substring(0, 1000)}... (truncated)`
 								: description;
 					}
-
 					return result;
 				}
 				return {
@@ -2244,38 +2033,31 @@ import "${packageName}"
 		this.logger.debug(
 			`Getting Rust documentation for ${crateName}${version ? ` version ${version}` : ""}`,
 		);
-
 		try {
 			// Check if crate is installed locally first
 			const isInstalled = await this.isRustCrateInstalledLocally(crateName);
-
 			if (isInstalled) {
 				this.logger.debug(`Using local documentation for ${crateName}`);
 				return await this.getLocalRustDoc(crateName);
 			}
-
 			// If not installed, try to fetch from docs.rs
 			this.logger.debug(
 				`Fetching Rust documentation for ${crateName} from docs.rs`,
 			);
-
 			try {
 				// Get crate details from crates.io
 				const crateDetails =
 					await this.rustDocsHandler.getCrateDetails(crateName);
-
 				// Get documentation from docs.rs
 				const documentation = await this.rustDocsHandler.getCrateDocumentation(
 					crateName,
 					version,
 				);
-
 				// Extract a brief description from the documentation
 				const briefDescription =
 					documentation.split("\n\n")[0] ||
 					crateDetails.description ||
 					`Rust crate: ${crateName}`;
-
 				return {
 					description: briefDescription,
 					usage: `## ${crateName} ${crateDetails.versions[0]?.version || ""}
@@ -2329,24 +2111,20 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 		this.logger.debug(
 			`Getting Swift documentation for ${packageUrl}${symbol ? `.${symbol}` : ""}`,
 		);
-
 		try {
 			// Check if package is installed locally first
 			const isInstalled = await this.isSwiftPackageInstalledLocally(
 				packageUrl,
 				projectPath,
 			);
-
 			if (isInstalled) {
 				this.logger.debug(`Using local documentation for ${packageUrl}`);
 				return await this.getLocalSwiftDoc(packageUrl, symbol, projectPath);
 			}
-
 			// If not installed, try to fetch from GitHub or other sources
 			this.logger.debug(
 				`Fetching Swift documentation for ${packageUrl} from remote sources`,
 			);
-
 			try {
 				// Extract package name from URL
 				const packageName = this.extractSwiftPackageNameFromUrl(packageUrl);
@@ -2356,7 +2134,6 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 						suggestInstall: true,
 					};
 				}
-
 				// Try to fetch README from GitHub if it's a GitHub URL
 				if (packageUrl.includes("github.com")) {
 					try {
@@ -2367,18 +2144,15 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 						if (githubParts.length === 2) {
 							const repoPath = githubParts[1];
 							const readmeUrl = `https://raw.githubusercontent.com/${repoPath}/main/README.md`;
-
 							const response = await axios.get(readmeUrl);
 							if (response.data) {
 								// Parse the README content
 								const readme = response.data;
-
 								// Extract relevant sections
 								const sections = readme.split(/#+\s/);
 								let description = "";
 								let usage = "";
 								let example = "";
-
 								for (const section of sections) {
 									const lower = section.toLowerCase();
 									if (
@@ -2400,7 +2174,6 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 										example = section.split("\n").slice(1).join("\n").trim();
 									}
 								}
-
 								return {
 									description: description || `Swift package: ${packageName}`,
 									usage: usage || undefined,
@@ -2412,7 +2185,6 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 						this.logger.error(`Error fetching GitHub README: ${githubError}`);
 					}
 				}
-
 				// If we couldn't get documentation from GitHub, return a basic result
 				return {
 					description: `Swift package: ${packageName}`,
@@ -2451,7 +2223,6 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 			includeExamples:
 				args.includeExamples !== undefined ? args.includeExamples : true,
 		};
-
 		// Use the NpmDocsHandler to get the documentation
 		const result = await this.npmDocsHandler.getNpmPackageDoc(
 			enhancedArgs,
@@ -2459,7 +2230,6 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 			this.isNpmPackageInstalledLocally.bind(this),
 			this.getLocalNpmDoc.bind(this),
 		);
-
 		// If there's API documentation, ensure it's only included as formatted markdown
 		// and remove the structured object to avoid cluttering the JSON response
 		if (result.apiDocumentation) {
@@ -2467,7 +2237,6 @@ ${crateDetails.homepage ? `- [Homepage](${crateDetails.homepage})` : ""}
 			// so we can safely remove the structured object
 			result.apiDocumentation = undefined;
 		}
-
 		return result;
 	}
 }

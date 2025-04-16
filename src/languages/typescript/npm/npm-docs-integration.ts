@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import axios from "axios";
-import { logger } from "../../../logger.js";
+import { logger } from "../../../utils/logger.js";
 import {
 	NpmDocsEnhancer,
 	type PackageApiDocumentation,
@@ -117,7 +117,7 @@ export class NpmDocsHandler {
 				packageName,
 				projectPath,
 			);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 			let packageInfo: any;
 			let apiDocumentation: PackageApiDocumentation | undefined;
 			let examples: string[] = [];
@@ -330,7 +330,7 @@ export class NpmDocsHandler {
 				packageName,
 				projectPath,
 			);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 			let packageInfo: any;
 			let apiDocumentation: PackageApiDocumentation | undefined;
 			let examples: string[] = [];
@@ -442,7 +442,7 @@ export class NpmDocsHandler {
 							if (apiDocumentation.exports.length > 0) {
 								formattedDoc += "### Exports\n\n";
 
-								apiDocumentation.exports.slice(0, 10).forEach((item) => {
+								for (const item of apiDocumentation.exports.slice(0, 10)) {
 									formattedDoc += `#### ${item.name}\n\n`;
 
 									if (item.description) {
@@ -452,14 +452,14 @@ export class NpmDocsHandler {
 									if (item.signature) {
 										formattedDoc += `\`\`\`typescript\n${item.signature}\n\`\`\`\n\n`;
 									}
-								});
+								}
 							}
 
 							// Add types
 							if (apiDocumentation.types.length > 0) {
 								formattedDoc += "### Types\n\n";
 
-								apiDocumentation.types.slice(0, 10).forEach((item) => {
+								for (const item of apiDocumentation.types.slice(0, 10)) {
 									formattedDoc += `#### ${item.name}\n\n`;
 
 									if (item.description) {
@@ -469,7 +469,7 @@ export class NpmDocsHandler {
 									if (item.typeDefinition) {
 										formattedDoc += `\`\`\`typescript\n${item.typeDefinition}\n\`\`\`\n\n`;
 									}
-								});
+								}
 							}
 						}
 					}
